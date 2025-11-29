@@ -81,24 +81,98 @@ export function DataVaultApp() {
       }
       return 0;
     };
-    const toSafeString = (value: unknown): string =>
-      typeof value === 'string' ? value : '';
+    const toSafeHex = (value: unknown): string => {
+      if (typeof value === 'string') return value;
+      if (typeof value === 'bigint') {
+        try {
+          return ethers.hexlify(value);
+        } catch {
+          return '';
+        }
+      }
+      if (value && typeof (value as { ciphertext?: unknown; handle?: unknown; value?: unknown }) === 'object') {
+        const inner = (value as { ciphertext?: unknown; handle?: unknown; value?: unknown }).ciphertext
+          ?? (value as { ciphertext?: unknown; handle?: unknown; value?: unknown }).handle
+          ?? (value as { ciphertext?: unknown; handle?: unknown; value?: unknown }).value;
+        if (inner) {
+          const converted = toSafeHex(inner);
+          if (converted) return converted;
+        }
+      }
+      if (value && typeof (value as { toHexString?: () => string }).toHexString === 'function') {
+        try {
+          return (value as { toHexString: () => string }).toHexString();
+        } catch {
+          return '';
+        }
+      }
+      if (value instanceof Uint8Array || ArrayBuffer.isView(value)) {
+        try {
+          return ethers.hexlify(value as Uint8Array);
+        } catch {
+          return '';
+        }
+      }
+      if (Array.isArray(value)) {
+        try {
+          return ethers.hexlify(Uint8Array.from(value as number[]));
+        } catch {
+          return '';
+        }
+      }
+      return '';
+    };
+    const toSafeString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
     return ownedIds
       .map((id, index) => {
-        const tuple = summaryResults[index]?.result as
-          | readonly [string, string, bigint, string, string, bigint]
-          | undefined;
-        if (!tuple) return undefined;
-        return {
-          id,
-          name: toSafeString(tuple[0]),
-          owner: toSafeString(tuple[1]),
-          createdAt: toSafeNumber(tuple[2]),
-          encryptedDatabaseAddress: toSafeString(tuple[3]),
-          addressCommitment: toSafeString(tuple[4]),
-          encryptedValueCount: toSafeNumber(tuple[5]),
+        const rawResult = summaryResults[index]?.result;
+
+        const fromArray = (tuple: readonly unknown[]) => {
+          const name = toSafeString(tuple[0]);
+          const owner = toSafeString(tuple[1]);
+          const createdAt = toSafeNumber(tuple[2]);
+          const encryptedDatabaseAddress = toSafeHex(tuple[3]);
+          const addressCommitment = toSafeHex(tuple[4]);
+          const encryptedValueCount = toSafeNumber(tuple[5]);
+          if (!encryptedDatabaseAddress || !addressCommitment) return undefined;
+          return {
+            id,
+            name,
+            owner,
+            createdAt,
+            encryptedDatabaseAddress,
+            addressCommitment,
+            encryptedValueCount,
+          };
         };
+
+        const fromObject = (obj: Record<string, unknown>) => {
+          const name = toSafeString(obj.name);
+          const owner = toSafeString(obj.owner);
+          const createdAt = toSafeNumber(obj.createdAt);
+          const encryptedDatabaseAddress = toSafeHex(obj.encryptedDatabaseAddress);
+          const addressCommitment = toSafeHex(obj.addressCommitment);
+          const encryptedValueCount = toSafeNumber(obj.encryptedValueCount);
+          if (!encryptedDatabaseAddress || !addressCommitment) return undefined;
+          return {
+            id,
+            name,
+            owner,
+            createdAt,
+            encryptedDatabaseAddress,
+            addressCommitment,
+            encryptedValueCount,
+          };
+        };
+
+        if (Array.isArray(rawResult)) {
+          return fromArray(rawResult);
+        }
+        if (rawResult && typeof rawResult === 'object') {
+          return fromObject(rawResult as Record<string, unknown>);
+        }
+        return undefined;
       })
       .filter(Boolean) as DatabaseSummary[];
   }, [summaryResults, ownedIds]);
@@ -187,7 +261,8 @@ export function DataVaultApp() {
     try {
       const handle = selectedDatabase.encryptedDatabaseAddress;
       if (!handle || typeof handle !== 'string') {
-        throw new Error('Encrypted database handle is missing. Re-select the database and try again.');
+        await refetchSummaries();
+        throw new Error('Encrypted database handle is missing. Re-select the database after refresh and try again.');
       }
       const normalizedHandle = handle.toLowerCase();
       const keypair = instance.generateKeypair();
