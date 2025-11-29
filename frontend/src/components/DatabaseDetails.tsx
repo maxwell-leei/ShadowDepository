@@ -37,13 +37,11 @@ export function DatabaseDetails({
   const [valueInput, setValueInput] = useState('');
   const [shareAddress, setShareAddress] = useState('');
 
-  const commitmentPreview = useMemo(
-    () =>
-      database
-        ? `${database.addressCommitment.slice(0, 8)}...${database.addressCommitment.slice(-6)}`
-        : '',
-    [database],
-  );
+  const commitmentPreview = useMemo(() => {
+    if (!database || !database.addressCommitment) return '';
+    const commitment = database.addressCommitment;
+    return `${commitment.slice(0, 8)}...${commitment.slice(-6)}`;
+  }, [database]);
 
   if (!database) {
     return (
@@ -139,9 +137,9 @@ export function DatabaseDetails({
         ) : (
           <div className="values-list">
             {encryptedValues.map((value, index) => (
-              <div key={value} className="value-row">
+              <div key={value ?? index} className="value-row">
                 <span>Record #{index + 1}</span>
-                <code className="code">{value.slice(0, 12)}...</code>
+                <code className="code">{value ? `${value.slice(0, 12)}...` : 'unavailable'}</code>
                 <span className="badge small">
                   {decryptedValues ? decryptedValues[index] ?? '***' : '***'}
                 </span>
