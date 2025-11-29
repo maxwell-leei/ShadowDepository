@@ -72,6 +72,18 @@ export function DataVaultApp() {
     if (!summaryResults) {
       return [];
     }
+    const toSafeNumber = (value: unknown): number => {
+      if (typeof value === 'bigint') return Number(value);
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    };
+    const toSafeString = (value: unknown): string =>
+      typeof value === 'string' ? value : '';
+
     return ownedIds
       .map((id, index) => {
         const tuple = summaryResults[index]?.result as
@@ -80,12 +92,12 @@ export function DataVaultApp() {
         if (!tuple) return undefined;
         return {
           id,
-          name: tuple[0],
-          owner: tuple[1],
-          createdAt: Number(tuple[2]),
-          encryptedDatabaseAddress: tuple[3],
-          addressCommitment: tuple[4],
-          encryptedValueCount: Number(tuple[5]),
+          name: toSafeString(tuple[0]),
+          owner: toSafeString(tuple[1]),
+          createdAt: toSafeNumber(tuple[2]),
+          encryptedDatabaseAddress: toSafeString(tuple[3]),
+          addressCommitment: toSafeString(tuple[4]),
+          encryptedValueCount: toSafeNumber(tuple[5]),
         };
       })
       .filter(Boolean) as DatabaseSummary[];
@@ -138,7 +150,7 @@ export function DataVaultApp() {
   );
 
   const [decryptedAddresses, setDecryptedAddresses] = useState<Record<number, string>>({});
-  const [decryptedNumbers, setDecryptedNumbers] = useState<Record<number, number[]>>({});
+  const [decryptedNumbers, setDecryptedNumbers] = useState<Record<number, (number | null)[]>>({});
 
   const [isDecryptingAddress, setIsDecryptingAddress] = useState(false);
   const [isDecryptingValues, setIsDecryptingValues] = useState(false);
@@ -348,7 +360,9 @@ export function DataVaultApp() {
       const decodedValues = encryptedValues.map((handle, index) => {
         const normalized = normalizedHandles[index];
         const raw = normalized ? result[normalized] ?? result[handle] : undefined;
-        return raw ? Number(raw) : NaN;
+        if (raw === undefined) return null;
+        const numeric = Number(raw);
+        return Number.isNaN(numeric) ? null : numeric;
       });
 
       setDecryptedNumbers((prev) => ({ ...prev, [selectedDatabase.id]: decodedValues }));

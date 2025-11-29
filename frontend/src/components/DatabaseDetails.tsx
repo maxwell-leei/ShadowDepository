@@ -6,7 +6,7 @@ type DatabaseDetailsProps = {
   decryptors: string[];
   encryptedValues: string[];
   decryptedAddress?: string;
-  decryptedValues?: number[];
+  decryptedValues?: (number | null)[];
   isDecryptingAddress: boolean;
   isDecryptingValues: boolean;
   isStoringValue: boolean;
@@ -141,7 +141,9 @@ export function DatabaseDetails({
                 <span>Record #{index + 1}</span>
                 <code className="code">{value ? `${value.slice(0, 12)}...` : 'unavailable'}</code>
                 <span className="badge small">
-                  {decryptedValues ? decryptedValues[index] ?? '***' : '***'}
+                  {decryptedValues && decryptedValues[index] !== null
+                    ? decryptedValues[index]
+                    : '***'}
                 </span>
               </div>
             ))}
