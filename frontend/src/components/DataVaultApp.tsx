@@ -167,11 +167,19 @@ export function DataVaultApp() {
     if (!selectedDatabase || !instance) {
       return;
     }
+    if (CONTRACT_ADDRESS === ZERO_ADDRESS) {
+      alert('Deploy the contract and set CONTRACT_ADDRESS before decrypting.');
+      return;
+    }
     setIsDecryptingAddress(true);
     try {
       const handle = selectedDatabase.encryptedDatabaseAddress;
+      if (!handle || typeof handle !== 'string') {
+        throw new Error('Encrypted database handle is missing. Re-select the database and try again.');
+      }
+      const normalizedHandle = handle.toLowerCase();
       const keypair = instance.generateKeypair();
-      const handlePairs = [{ handle, contractAddress: CONTRACT_ADDRESS }];
+      const handlePairs = [{ handle: normalizedHandle, contractAddress: CONTRACT_ADDRESS }];
       const startTimeStamp = Math.floor(Date.now() / 1000).toString();
       const durationDays = '10';
       const contractAddresses = [CONTRACT_ADDRESS];
@@ -202,7 +210,8 @@ export function DataVaultApp() {
         durationDays,
       );
 
-      const decryptedPayload = result[handle] ?? result[handle.toLowerCase()];
+      const decryptedPayload =
+        result[normalizedHandle] ?? result[handle] ?? result[normalizedHandle.toLowerCase()];
       if (!decryptedPayload) {
         throw new Error('Unable to decrypt the database key.');
       }
@@ -286,6 +295,10 @@ export function DataVaultApp() {
     if (!selectedDatabase || !instance) {
       return;
     }
+    if (CONTRACT_ADDRESS === ZERO_ADDRESS) {
+      alert('Deploy the contract and set CONTRACT_ADDRESS before decrypting values.');
+      return;
+    }
     if (!encryptedValues.length) {
       alert('No encrypted values to decrypt yet.');
       return;
@@ -293,10 +306,16 @@ export function DataVaultApp() {
     setIsDecryptingValues(true);
     try {
       const keypair = instance.generateKeypair();
-      const handlePairs = encryptedValues.map((handle: string) => ({
-        handle,
-        contractAddress: CONTRACT_ADDRESS,
-      }));
+      const normalizedHandles = encryptedValues.map((handle) =>
+        typeof handle === 'string' ? handle.toLowerCase() : null,
+      );
+      const handlePairs = normalizedHandles
+        .map((handle) => (handle ? { handle, contractAddress: CONTRACT_ADDRESS } : null))
+        .filter(Boolean) as { handle: string; contractAddress: `0x${string}` }[];
+
+      if (!handlePairs.length) {
+        throw new Error('No valid encrypted handles to decrypt.');
+      }
       const startTimeStamp = Math.floor(Date.now() / 1000).toString();
       const durationDays = '10';
       const contractAddresses = [CONTRACT_ADDRESS];
@@ -326,8 +345,9 @@ export function DataVaultApp() {
         durationDays,
       );
 
-      const decodedValues = encryptedValues.map((handle) => {
-        const raw = result[handle] ?? result[handle.toLowerCase()];
+      const decodedValues = encryptedValues.map((handle, index) => {
+        const normalized = normalizedHandles[index];
+        const raw = normalized ? result[normalized] ?? result[handle] : undefined;
         return raw ? Number(raw) : NaN;
       });
 
