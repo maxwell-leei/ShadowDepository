@@ -85,7 +85,7 @@ export function DataVaultApp() {
       if (typeof value === 'string') return value;
       if (typeof value === 'bigint') {
         try {
-          return ethers.hexlify(value);
+          return ethers.toBeHex(value);
         } catch {
           return '';
         }
